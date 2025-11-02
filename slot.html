@@ -1,0 +1,503 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Diamond Casino — Hybrid BlackGold Slot (6 Reel)</title>
+<style>
+:root{
+  --bg:#070606;
+  --card:#0d0d0d;
+  --gold:#d6a84a;
+  --gold-2:#f6d78f;
+  --muted:#bfb6a0;
+  --accent:#c0262e;
+  --glass: rgba(255,255,255,0.03);
+  --shadow-lg: 0 18px 60px rgba(0,0,0,0.7);
+}
+
+/* Basic reset */
+*{box-sizing:border-box;margin:0;padding:0;font-family:Inter,system-ui,Arial,sans-serif;-webkit-font-smoothing:antialiased;}
+html,body{height:100%;background:linear-gradient(180deg,#050505,#0b0606);color:#fff;}
+
+/* Page layout: centered card (rencana B) */
+.page{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:22px;}
+.card{
+  width:100%;max-width:1150px;border-radius:16px;background:linear-gradient(180deg, rgba(255,255,255,0.02), rgba(0,0,0,0.02));
+  padding:18px;border:1px solid rgba(214,168,74,0.05);box-shadow:var(--shadow-lg);
+}
+
+/* Header */
+.header{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;}
+.brand{display:flex;align-items:center;gap:12px;}
+.logo{font-weight:900;color:var(--gold);font-size:20px;text-shadow:0 6px 24px rgba(214,168,74,0.06);}
+.user-controls{display:flex;align-items:center;gap:8px;flex-wrap:wrap;}
+.btn{padding:8px 12px;border-radius:10px;background:#141414;border:1px solid rgba(255,255,255,0.02);color:#fff;cursor:pointer;font-weight:800;}
+.btn:hover{transform:translateY(-2px);box-shadow:0 10px 30px rgba(0,0,0,0.45);}
+
+/* stats */
+.stats{display:flex;gap:12px;margin-top:14px;flex-wrap:wrap;}
+.stat{flex:1;min-width:140px;background:linear-gradient(180deg,#0b0b0b,#0a0a0a);padding:12px;border-radius:10px;text-align:center;border:1px solid rgba(255,255,255,0.03);}
+.stat .value{font-weight:800;font-size:18px;color:var(--gold-2);}
+.stat .label{font-size:12px;color:var(--muted);margin-top:6px;}
+
+/* MAIN: hybrid A (casino horizontal style) inside B card */
+.main{margin-top:18px;border-radius:14px;padding:18px;background:linear-gradient(180deg,#0b0606,#120707);border:1px solid rgba(214,168,74,0.04);box-shadow:inset 0 8px 24px rgba(0,0,0,0.5);}
+.machine{display:flex;flex-direction:column;align-items:center;gap:18px;}
+
+/* reels row (6 reels horizontal) */
+.reels{display:flex;gap:12px;align-items:center;justify-content:center;padding:18px;border-radius:12px;background:linear-gradient(180deg, rgba(255,255,255,0.02), rgba(0,0,0,0.02));box-shadow:inset 0 4px 20px rgba(0,0,0,0.6);}
+.reel{
+  width:96px;height:96px;border-radius:12px;background:radial-gradient(circle,#fff,#e9e9e9);
+  display:flex;align-items:center;justify-content:center;font-size:46px;color:#111;position:relative;overflow:hidden;
+  box-shadow:inset 0 -6px 12px rgba(0,0,0,0.18), 0 8px 22px rgba(0,0,0,0.6);
+  transition:transform .18s cubic-bezier(.2,.9,.2,1), box-shadow .18s;
+  border:2px solid rgba(214,168,74,0.06);
+}
+.reel.spin{transform:translateY(-8px) scale(0.985);box-shadow:0 20px 50px rgba(0,0,0,0.6);}
+
+/* symbol and win glow */
+.reel .symbol{display:inline-block;transition:transform .16s,text-shadow .18s;}
+.reel.win .symbol{transform:scale(1.08) translateY(-6px);text-shadow:0 12px 40px rgba(214,168,74,0.55);}
+.glow-anim{
+  position:absolute;inset:0;border-radius:12px;pointer-events:none;mix-blend-mode:screen;opacity:0;transition:opacity .2s;
+  background:radial-gradient(circle at 50% 30%, rgba(246,185,59,0.18), rgba(246,185,59,0.06) 35%, transparent 55%);
+}
+.reel.win .glow-anim{opacity:1;animation:glowPulse 900ms ease-out;}
+
+@keyframes glowPulse{
+  0%{transform:scale(.95);opacity:0.5;}
+  50%{transform:scale(1.06);opacity:1;}
+  100%{transform:scale(1);opacity:0.6;}
+}
+
+/* controls horizontal under reels */
+.controls{display:flex;gap:16px;align-items:center;justify-content:space-between;margin-top:8px;flex-wrap:wrap;}
+.bet-card{flex:1;min-width:260px;background:linear-gradient(180deg,#0f0f0f,#0b0b0b);padding:14px;border-radius:10px;text-align:center;border:1px solid rgba(255,255,255,0.03);box-shadow:inset 0 0 10px rgba(255,255,255,0.02);}
+.bet-card .title{color:var(--muted);font-size:13px;}
+.bet-card .amount{font-size:18px;font-weight:800;margin-top:6px;color:var(--gold-2);text-shadow:0 0 8px rgba(246,185,59,0.12);}
+
+.spin-area{flex:0 0 420px;max-width:420px;text-align:center;}
+.spin-btn{width:100%;padding:14px;border-radius:12px;border:none;font-weight:900;font-size:18px;background:linear-gradient(90deg,var(--accent),#ff4343);color:#fff;box-shadow:0 16px 40px rgba(178,28,28,0.32);cursor:pointer;}
+.spin-btn:active{transform:scale(.985);}
+
+/* small controls */
+.inline{display:flex;gap:8px;justify-content:center;margin-top:10px;flex-wrap:wrap;}
+.small-btn{padding:8px 10px;border-radius:8px;background:#141414;border:1px solid rgba(255,255,255,0.02);cursor:pointer;color:#fff;font-weight:800;}
+.rules{color:var(--muted);text-align:center;margin-top:10px;font-size:13px;max-height:0;overflow:hidden;transition:max-height .36s ease,opacity .36s;}
+.rules.show{max-height:140px;opacity:1;}
+
+/* footer */
+.footer{margin-top:12px;text-align:center;color:var(--muted);font-size:13px;}
+
+/* modal riwayat */
+.modal{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.7);justify-content:center;align-items:center;z-index:9999;}
+.modal .box{background:#0f0f0f;padding:18px;border-radius:12px;width:95%;max-width:760px;color:#fff;box-shadow:0 0 40px rgba(0,0,0,0.6);}
+.table{width:100%;border-collapse:collapse;margin-top:10px;}
+.table th,.table td{padding:8px;border-bottom:1px solid #222;text-align:center;}
+.status-menunggu{color:orange;font-weight:700;}
+.status-sukses{color:lightgreen;font-weight:700;}
+.status-ditolak{color:#ff6b6b;font-weight:700;}
+
+/* responsive */
+@media(max-width:980px){
+  .reel{width:84px;height:84px;font-size:40px;}
+  .spin-area{max-width:320px;flex-basis:320px;}
+}
+@media(max-width:620px){
+  .card{padding:14px;}
+  .reels{padding:12px;gap:8px;}
+  .reel{width:72px;height:72px;font-size:34px;border-radius:10px;}
+  .controls{flex-direction:column;align-items:stretch;}
+  .spin-area{width:100%;}
+  .bet-card{width:100%;}
+}
+</style>
+</head>
+<body>
+<div class="page">
+  <div class="card">
+    <!-- Header -->
+    <div class="header">
+      <div class="brand">
+        <div class="logo">DIAMOND CASINO</div>
+        <div style="color:var(--muted);font-size:13px;"></div>
+      </div>
+      <div class="user-controls">
+        <div id="displayUser" style="font-weight:800;color:var(--gold-2)">User: …</div>
+        <button id="topUpBtn" class="btn">Isi Saldo</button>
+        <button id="withdrawBtn" class="btn">Tarik Saldo</button>
+        <button id="historyBtn" class="btn">Riwayat</button>
+        <button id="btnDeleteAccount" class="btn">Hapus Akun</button>
+        <button id="btnLogout" class="btn">Logout</button>
+      </div>
+    </div>
+
+    <!-- Stats -->
+    <div class="stats" style="margin-top:12px;">
+      <div class="stat"><div class="value" id="balance">Rp 0</div><div class="label">Saldo</div></div>
+      <div class="stat"><div class="value" id="lastWin">Rp 0</div><div class="label">Kemenangan Terakhir</div></div>
+      <div class="stat"><div class="value" id="totalSpins">0</div><div class="label">Total Putaran</div></div>
+    </div>
+
+    <!-- Main machine -->
+    <div class="main">
+      <div class="machine">
+        <div class="reels" id="reelsRow">
+          <div class="reel" id="r0"><div class="glow-anim"></div><span class="symbol">🍒</span></div>
+          <div class="reel" id="r1"><div class="glow-anim"></div><span class="symbol">🍋</span></div>
+          <div class="reel" id="r2"><div class="glow-anim"></div><span class="symbol">🍊</span></div>
+          <div class="reel" id="r3"><div class="glow-anim"></div><span class="symbol">🔔</span></div>
+          <div class="reel" id="r4"><div class="glow-anim"></div><span class="symbol">⭐</span></div>
+          <div class="reel" id="r5"><div class="glow-anim"></div><span class="symbol">💎</span></div>
+        </div>
+
+        <div class="controls">
+          <div class="bet-card">
+            <div class="title">Taruhan</div>
+            <div class="amount" id="betDisplay">Rp 10.000</div>
+
+            <div style="display:flex;gap:8px;justify-content:center;margin-top:10px;">
+              <button id="decBtn" class="small-btn">-</button>
+              <input id="betInput" type="number" min="1000" step="1000" value="10000" style="width:140px;border-radius:8px;background:#111;color:#fff;border:1px solid #333;text-align:center;font-weight:700;"/>
+              <button id="incBtn" class="small-btn">+</button>
+            </div>
+
+            <div style="display:flex;gap:12px;justify-content:center;margin-top:12px;">
+              <label style="font-size:13px;color:var(--muted);"><input type="radio" name="betMode" value="manual" checked> Manual</label>
+              <label style="font-size:13px;color:var(--muted);"><input type="radio" name="betMode" value="max"> Max Bet</label>
+            </div>
+          </div>
+
+          <div class="spin-area">
+            <button id="spinBtn" class="spin-btn">PUTAR</button>
+            <div class="inline" style="margin-top:8px;">
+              <button id="toggleRulesBtn" class="small-btn">Tampilkan Rules</button>
+            </div>
+            <div class="rules" id="rulesContent" style="margin-top:12px;">
+              💎 Diamond Jackpot x20 • ⭐ Star x10 • 6 same = x6 • 5 same = x5 • 3 same = x3 • any 2 same = x2
+            </div>
+          </div>
+        </div>
+
+        <div class="footer" style="margin-top:12px;">Made with ♥ — Diamond Casino</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal Riwayat -->
+<div id="riwayatModal" class="modal" role="dialog" aria-hidden="true">
+  <div class="box">
+    <h3>Riwayat Transaksi</h3>
+    <table class="table" id="riwayatTable"><thead><tr><th>Jenis</th><th>Jumlah</th><th>Status</th><th>Waktu</th></tr></thead><tbody></tbody></table>
+    <div style="text-align:right;margin-top:10px;"><button onclick="closeRiwayat()" class="btn">Tutup</button></div>
+  </div>
+</div>
+
+<script>
+/* --------------------------
+   LOGIKA UTAMA (6 REEL) — Semua fitur asli dipertahankan.
+   - Diamond (index 5) jackpot x20
+   - Top-up / Withdraw -> pending (tidak langsung mengurangi/menambah saldo)
+   - Riwayat disimpan di localStorage('history_'+user)
+   - Storage listener untuk sync admin tab
+   -------------------------- */
+
+const icons = ['🍒','🍋','🍊','🔔','⭐','💎'];
+
+let currentUser = localStorage.getItem('currentUser');
+let users = JSON.parse(localStorage.getItem('users') || '{}');
+if(!currentUser || !users[currentUser]){
+  alert('Login dulu!'); window.location = 'login.html';
+}
+if(users[currentUser]?.banned){
+  alert('Akun diblokir!'); localStorage.removeItem('currentUser'); window.location='login.html';
+}
+
+let balance = users[currentUser].saldo || 0;
+let lastWin = 0;
+let totalSpins = 0;
+let spinning = false;
+let history = JSON.parse(localStorage.getItem('history_' + currentUser) || '[]');
+
+/* Elements */
+const reelsEls = [...Array(6)].map((_,i)=>document.getElementById('r'+i));
+const balanceEl = document.getElementById('balance'), lastWinEl = document.getElementById('lastWin'), totalSpinsEl = document.getElementById('totalSpins');
+const spinBtn = document.getElementById('spinBtn'), betInput = document.getElementById('betInput');
+const incBtn = document.getElementById('incBtn'), decBtn = document.getElementById('decBtn');
+const topUpBtn = document.getElementById('topUpBtn'), withdrawBtn = document.getElementById('withdrawBtn');
+const btnDeleteAccount = document.getElementById('btnDeleteAccount'), logoutBtn = document.getElementById('btnLogout');
+const betModeRadios = document.getElementsByName('betMode');
+const toggleRulesBtn = document.getElementById('toggleRulesBtn'), rulesContent = document.getElementById('rulesContent');
+const historyBtn = document.getElementById('historyBtn');
+
+document.getElementById('displayUser').innerText = 'User: ' + currentUser;
+
+function saveUser(){ users[currentUser].saldo = balance; localStorage.setItem('users', JSON.stringify(users)); }
+function formatRp(n){ return 'Rp ' + Math.round(n).toString().replace(/\B(?=(\d{3})+(?!\d))/g,'.'); }
+function rndIndex(){ return Math.floor(Math.random()*icons.length); }
+function updateUI(){ balanceEl.textContent = formatRp(balance); lastWinEl.textContent = formatRp(lastWin); totalSpinsEl.textContent = totalSpins; document.getElementById('betDisplay').innerText = formatRp(Number(betInput.value||0)); }
+
+/* Bet mode */
+function updateBetMode(){
+  const mode = [...betModeRadios].find(r=>r.checked)?.value;
+  if(mode === 'max'){ betInput.value = Math.max(0, balance); }
+  updateUI();
+}
+[...betModeRadios].forEach(r=>r.addEventListener('change', updateBetMode));
+
+/* Rules toggle */
+toggleRulesBtn?.addEventListener('click', ()=>{
+  rulesContent.classList.toggle('show');
+  toggleRulesBtn.textContent = rulesContent.classList.contains('show') ? 'Sembunyikan Rules' : 'Tampilkan Rules';
+});
+
+/* Audio: simple tones */
+const AudioCtx = window.AudioContext || window.webkitAudioContext;
+let audioCtx;
+try{ audioCtx = new AudioCtx(); } catch(e){ audioCtx = null; }
+function playTone(freq, type='sine', duration=0.12, gain=0.08){
+  if(!audioCtx) return;
+  const o = audioCtx.createOscillator();
+  const g = audioCtx.createGain();
+  o.type = type; o.frequency.value = freq; o.connect(g); g.connect(audioCtx.destination);
+  g.gain.value = 0; o.start();
+  g.gain.linearRampToValueAtTime(gain, audioCtx.currentTime + 0.01);
+  g.gain.linearRampToValueAtTime(0.0001, audioCtx.currentTime + duration);
+  o.stop(audioCtx.currentTime + duration + 0.02);
+}
+function playClick(){ playTone(900,'square',0.04,0.06); }
+function playLose(){ playTone(140,'sine',0.22,0.09); setTimeout(()=>playTone(90,'sine',0.18,0.08),160); }
+function playWinSmall(){ playTone(520,'triangle',0.12,0.12); setTimeout(()=>playTone(620,'triangle',0.11,0.1),120); }
+function playWinBig(){ playTone(720,'sine',0.14,0.12); setTimeout(()=>playTone(840,'sine',0.14,0.12),140); }
+function playJackpot(){ playTone(1100,'sawtooth',0.16,0.16); setTimeout(()=>playTone(1300,'sawtooth',0.18,0.18),140); }
+
+/* Payout rules (6 reels) */
+function payout(indices, stake){
+  const counts = {};
+  indices.forEach(i => counts[i] = (counts[i]||0) + 1);
+  const values = Object.values(counts).sort((a,b)=>b-a);
+  const topCount = values[0] || 0;
+  const topSymbol = Number(Object.keys(counts).find(k => counts[k] === topCount));
+  if(topCount === 6 && topSymbol === 5) return stake * 20; // diamond x20
+  if(topCount === 6 && topSymbol === 4) return stake * 10; // star x10
+  if(topCount === 6) return stake * 6;
+  if(topCount === 5) return stake * 5;
+  if(topCount === 3) return stake * 3;
+  if(topCount === 2) return stake * 2;
+  return 0;
+}
+
+function shuffle(a){ for(let i=a.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [a[i],a[j]]=[a[j],a[i]];} return a; }
+function finalForDiamond(){ return [5,5,5,5,5,5]; }
+function finalForStar(){ return [4,4,4,4,4,4]; }
+function finalForBig(){ const idx=rndIndex(); return [idx,idx,idx,idx,idx,idx]; }
+function finalForSmall(){ const pair = rndIndex(); const others=[]; while(others.length<4){ const r=rndIndex(); if(r===pair||others.includes(r)) continue; others.push(r);} return shuffle([pair,pair,others[0],others[1],others[2],others[3]]); }
+function finalForLose(){ const s=new Set(); while(s.size<6) s.add(rndIndex()); return Array.from(s); }
+
+/* quick random tick animation */
+function quickSpinTick(reels, tickCount=18, delay=45){
+  return new Promise(resolve=>{
+    let t=0;
+    const iv = setInterval(()=>{
+      reels.forEach(el => el.querySelector('.symbol').textContent = icons[rndIndex()]);
+      if(++t >= tickCount){ clearInterval(iv); resolve(); }
+    }, delay);
+  });
+}
+
+/* main spin function */
+async function spin(){
+  if(spinning) return;
+  const mode = [...betModeRadios].find(r=>r.checked)?.value;
+  let bet = Math.max(1000, Math.round(Number(betInput.value) || 0));
+  if(mode === 'max'){ bet = balance; betInput.value = bet; }
+  if(bet > balance){ alert('Saldo tidak cukup.'); return; }
+
+  spinning = true;
+  spinBtn.disabled = true;
+  playClick();
+
+  // deduct immediately (as original)
+  balance -= bet;
+  updateUI();
+  saveUser();
+
+  reelsEls.forEach(el => el.classList.add('spin'));
+  await quickSpinTick(reelsEls, 20, 40);
+
+  // load admin settings (slotSettings_user)
+  const key = 'slotSettings_' + currentUser;
+  const s = JSON.parse(localStorage.getItem(key) || '{}');
+  let jackpot = s.jackpot ?? 5, big = s.big ?? 20, small = s.small ?? 30, lose = s.lose ?? 45;
+  let total = jackpot + big + small + lose;
+  if(total <= 0){ jackpot = 5; big = 20; small = 30; lose = 45; total = 100; }
+  if(total > 100){
+    const scale = 100 / total;
+    jackpot = Math.max(0, Math.round(jackpot * scale));
+    big = Math.max(0, Math.round(big * scale));
+    small = Math.max(0, Math.round(small * scale));
+    lose = Math.max(0, 100 - (jackpot + big + small));
+  }
+
+  const roll = Math.random() * 100;
+  let finalArr;
+  if(roll < jackpot){
+    finalArr = Math.random() < 0.6 ? finalForDiamond() : finalForStar();
+  } else if(roll < jackpot + big){
+    finalArr = finalForBig();
+  } else if(roll < jackpot + big + small){
+    finalArr = finalForSmall();
+  } else {
+    finalArr = finalForLose();
+  }
+
+  // reveal results sequentially with glow on winners
+  for(let i=0;i<reelsEls.length;i++){
+    const sym = reelsEls[i].querySelector('.symbol');
+    sym.textContent = icons[finalArr[i]];
+    reelsEls[i].classList.add('win');
+    // subtle glow
+    await new Promise(r => setTimeout(r, 110));
+    reelsEls[i].classList.remove('win');
+  }
+
+  const win = payout(finalArr, bet);
+  if(win > 0){
+    balance += win;
+    saveUser();
+    if(win >= bet * 20){ playJackpot(); spinBtn.textContent = '💎 JACKPOT!'; }
+    else if(win >= bet * 10){ playWinBig(); spinBtn.textContent = 'MENANG BESAR!'; }
+    else { playWinSmall(); spinBtn.textContent = 'MENANG!'; }
+    // add glow on all winning reels for effect
+    reelsEls.forEach((el, idx) => {
+      const counts = {};
+      finalArr.forEach(i => counts[i] = (counts[i]||0)+1);
+      const topCount = Math.max(...Object.values(counts));
+      // highlight reels that match the top symbol
+      const topSymbol = Number(Object.keys(counts).find(k => counts[k]===topCount));
+      if(finalArr[idx] === topSymbol) el.classList.add('win');
+    });
+    setTimeout(()=> reelsEls.forEach(el=>el.classList.remove('win')), 1400);
+  } else {
+    playLose();
+    spinBtn.textContent = 'KALAH';
+  }
+
+  lastWin = win;
+  totalSpins++;
+  updateUI();
+
+  // reset states
+  setTimeout(()=>{
+    reelsEls.forEach(el => el.classList.remove('spin'));
+    spinBtn.textContent = 'PUTAR';
+    spinBtn.disabled = false;
+    spinning = false;
+  }, 1200);
+}
+
+/* Top-up & Withdraw (pending behavior preserved) */
+function formatNumberInput(v){ return Math.round(Number(v)) || 0; }
+
+function topUpFlow(){
+  const preset = prompt("Masukkan nominal isi saldo (contoh: 10000):","10000");
+  if(preset === null) return;
+  const amt = formatNumberInput(preset);
+  if(amt <= 0){ alert("Nominal tidak valid."); return; }
+  const tx = { user: currentUser, type: 'Top Up', amount: amt, status: 'Menunggu', time: Date.now() };
+  const pending = JSON.parse(localStorage.getItem('pendingTransactions') || '[]');
+  pending.push(tx);
+  localStorage.setItem('pendingTransactions', JSON.stringify(pending));
+  history.push(tx);
+  localStorage.setItem('history_' + currentUser, JSON.stringify(history));
+  alert("✅ Permintaan isi ulang terkirim. Menunggu persetujuan admin.");
+}
+
+function withdrawFlow(){
+  const ewallet = prompt("Nama e-wallet (misal: DANA / OVO / GOPAY):","DANA");
+  if(ewallet === null) return;
+  const account = prompt("Masukkan nomor akun "+ewallet+":","");
+  if(account === null || account.trim() === ''){ alert("Nomor akun wajib diisi."); return; }
+  const nominal = prompt("Masukkan nominal tarik (contoh: 50000):","50000");
+  if(nominal === null) return;
+  const amt = formatNumberInput(nominal);
+  if(amt <= 0){ alert("Nominal tidak valid."); return; }
+  if(amt > balance){ alert("Saldo tidak cukup!"); return; }
+  const tx = { user: currentUser, type: 'Withdraw', amount: amt, status: 'Menunggu', time: Date.now(), ewallet: ewallet, account: account };
+  const pending = JSON.parse(localStorage.getItem('pendingTransactions') || '[]');
+  pending.push(tx);
+  localStorage.setItem('pendingTransactions', JSON.stringify(pending));
+  history.push(tx);
+  localStorage.setItem('history_' + currentUser, JSON.stringify(history));
+  alert("✅ Permintaan tarik terkirim. Menunggu persetujuan admin.");
+}
+
+/* History modal */
+function showHistory(){
+  const modal = document.getElementById('riwayatModal');
+  const tbody = document.querySelector('#riwayatTable tbody');
+  const riwayat = JSON.parse(localStorage.getItem('history_'+currentUser) || '[]');
+  tbody.innerHTML = '';
+  if(riwayat.length === 0){
+    tbody.innerHTML = `<tr><td colspan="4">Belum ada riwayat.</td></tr>`;
+  } else {
+    riwayat.slice().reverse().forEach(r=>{
+      const cls = r.status==='Menunggu' ? 'status-menunggu' : (r.status==='Sukses' ? 'status-sukses' : 'status-ditolak');
+      const time = new Date(r.time).toLocaleString();
+      tbody.innerHTML += `<tr>
+        <td>${r.type}</td>
+        <td>${formatRp(r.amount)}</td>
+        <td class="${cls}">${r.status}</td>
+        <td>${time}</td>
+      </tr>`;
+    });
+  }
+  modal.style.display = 'flex';
+}
+function closeRiwayat(){ document.getElementById('riwayatModal').style.display = 'none'; }
+
+/* Delete account (unchanged) */
+function deleteAccount(){
+  if(confirm('Apakah Anda yakin ingin menghapus akun ini? Semua data akan hilang.')){
+    delete users[currentUser];
+    localStorage.setItem('users', JSON.stringify(users));
+    localStorage.removeItem('currentUser');
+    localStorage.removeItem('history_'+currentUser);
+    let pending = JSON.parse(localStorage.getItem('pendingTransactions') || '[]');
+    pending = pending.filter(p => p.user !== currentUser);
+    localStorage.setItem('pendingTransactions', JSON.stringify(pending));
+    alert('Akun telah dihapus.');
+    window.location = 'daftar.html';
+  }
+}
+
+/* Events bindings */
+document.addEventListener('DOMContentLoaded', ()=>{
+  topUpBtn.addEventListener('click', topUpFlow);
+  withdrawBtn.addEventListener('click', withdrawFlow);
+  historyBtn.addEventListener('click', showHistory);
+  document.getElementById('btnDeleteAccount').addEventListener('click', deleteAccount);
+  document.getElementById('btnLogout').addEventListener('click', ()=>{ localStorage.removeItem('currentUser'); window.location='login.html'; });
+  spinBtn.addEventListener('click', spin);
+  incBtn.addEventListener('click', ()=>{ betInput.value = Math.max(1000, Math.round(Number(betInput.value)||0)) + 1000; updateUI(); });
+  decBtn.addEventListener('click', ()=>{ betInput.value = Math.max(1000, Math.round(Number(betInput.value)||0) - 1000); updateUI(); });
+  betInput.addEventListener('input', ()=>{ let v = Math.round(Number(betInput.value)||0); if(!v || v < 1000) v = 1000; betInput.value = v; updateUI(); });
+  updateUI();
+});
+
+/* Storage listener to sync with admin tab */
+window.addEventListener('storage', (ev)=>{
+  if(ev.key === 'users' || (ev.key && ev.key.startsWith('history_')) || ev.key === 'pendingTransactions'){
+    users = JSON.parse(localStorage.getItem('users') || '{}');
+    balance = users[currentUser]?.saldo || 0;
+    history = JSON.parse(localStorage.getItem('history_'+currentUser) || '[]');
+    updateUI();
+    const modal = document.getElementById('riwayatModal');
+    if(modal.style.display === 'flex') showHistory();
+  }
+});
+</script>
+</body>
+</html>
