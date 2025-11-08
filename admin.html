@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1"/>
-<title>Admin Panel - Lengkap</title>
+<title>Admin Panel - Realtime</title>
 <style>
 body{margin:0;font-family:Arial;background:#0b0b0b;color:#fff;display:flex;justify-content:center;align-items:flex-start;padding:20px;}
 .card{width:100%;max-width:900px;background:#111;padding:20px;border-radius:12px;box-shadow:0 10px 40px rgba(0,0,0,0.6);}
@@ -26,12 +26,180 @@ input,select{padding:8px;border-radius:6px;border:none;background:#222;color:#ff
 .range-box label{display:block;margin-top:6px;}
 .range-box input[type=range]{width:100%;}
 </style>
+<!-- Firebase -->
+<script type="module">
+  // ✅ Masukkan konfigurasi proyek Firebase kamu di sini
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-app.js";
+  import { getDatabase, ref, get, set, update, onValue, push, remove } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-database.js";
+
+  const firebaseConfig = {
+  apiKey: "AIzaSyDAkDFS1Mp8zAJvXq8P8SkzJnmbZRyHKaY",
+  authDomain: "testingsaja-bb474.firebaseapp.com",
+  projectId: "testingsaja-bb474",
+  storageBucket: "testingsaja-bb474.firebasestorage.app",
+  messagingSenderId: "1068578641763",
+  appId: "1:1068578641763:web:3832c9485c5092df3b6556
+  };
+
+  const app = initializeApp(firebaseConfig);
+  const db = getDatabase(app);
+
+  // --- ELEMENT DOM ---
+  const admins = { admin: '1234' };
+  const loginRow = document.getElementById('loginRow');
+  const btnLogin = document.getElementById('btnLogin');
+  const adminArea = document.getElementById('adminArea');
+  const userSelect = document.getElementById('userSelect');
+  const btnRefresh = document.getElementById('btnRefresh');
+  const pendingTableBody = document.querySelector('#pendingTable tbody');
+  const historyTableBody = document.querySelector('#historyTable tbody');
+
+  // --- LOGIN ---
+  btnLogin.onclick = async ()=>{
+    const u = adminUser.value.trim();
+    const p = adminPass.value.trim();
+    if(admins[u]!==p) return alert('Login gagal!');
+    loginRow.style.display='none';
+    adminArea.style.display='block';
+    populateUsers();
+    renderPending();
+  };
+
+  // --- USERS ---
+  async function populateUsers(){
+    const usersSnap = await get(ref(db,'users'));
+    const users = usersSnap.exists()?usersSnap.val():{};
+    userSelect.innerHTML='';
+    Object.keys(users).forEach(u=>{
+      const opt=document.createElement('option');
+      opt.value=u;
+      opt.text=u + (users[u].banned?' [BANNED]':'');
+      userSelect.appendChild(opt);
+    });
+    if(userSelect.options.length>0) loadUserSettings(userSelect.value);
+    userSelect.onchange=()=> loadUserSettings(userSelect.value);
+    updateBanButton();
+  }
+
+  // --- BAN / UNBAN ---
+  const btnBan=document.getElementById('btnBan');
+  btnBan.onclick=async ()=>{
+    const u=userSelect.value; if(!u) return;
+    const userRef=ref(db,'users/'+u);
+    const snap=await get(userRef);
+    if(!snap.exists()) return;
+    const banned=!snap.val().banned;
+    await update(userRef,{banned});
+    alert(banned?`✅ ${u} diblokir.`:`🔓 ${u} diaktifkan kembali.`);
+    populateUsers();
+  };
+  async function updateBanButton(){
+    const u=userSelect.value; if(!u) return;
+    const snap=await get(ref(db,'users/'+u));
+    if(!snap.exists()) return;
+    btnBan.textContent = snap.val().banned ? 'Unban Akun' : 'Ban Akun';
+  }
+
+  // --- SETTING SLOT ---
+  const jackpot=document.getElementById('jackpot'),
+        big=document.getElementById('big'),
+        small=document.getElementById('small'),
+        lose=document.getElementById('lose');
+  const vJ=document.getElementById('vJackpot'),
+        vB=document.getElementById('vBig'),
+        vS=document.getElementById('vSmall'),
+        vL=document.getElementById('vLose');
+  [jackpot,big,small,lose].forEach(r=>r.oninput=()=>{
+    vJ.textContent=jackpot.value;
+    vB.textContent=big.value;
+    vS.textContent=small.value;
+    vL.textContent=lose.value;
+  });
+  async function loadUserSettings(u){
+    updateBanButton();
+    const sRef=ref(db,'slotSettings/'+u);
+    const snap=await get(sRef);
+    const s=snap.exists()?snap.val():{};
+    jackpot.value=s.jackpot||5; big.value=s.big||20; small.value=s.small||30; lose.value=s.lose||45;
+    vJ.textContent=jackpot.value; vB.textContent=big.value; vS.textContent=small.value; vL.textContent=lose.value;
+  }
+  document.getElementById('btnSaveSlot').onclick=async ()=>{
+    const u=userSelect.value; if(!u) return;
+    const data={jackpot:+jackpot.value,big:+big.value,small:+small.value,lose:+lose.value};
+    await set(ref(db,'slotSettings/'+u),data);
+    alert('🎰 Setting kemenangan disimpan untuk '+u);
+  };
+
+  // --- TRANSAKSI PENDING ---
+  function renderPending(){
+    onValue(ref(db,'pendingTransactions'),snap=>{
+      const pending=snap.exists()?Object.values(snap.val()):[];
+      pendingTableBody.innerHTML='';
+      if(pending.length===0){ pendingTableBody.innerHTML='<tr><td colspan="8">Belum ada transaksi pending.</td></tr>'; return; }
+      pending.forEach((p,idx)=>{
+        const info=(p.type==='Withdraw'&&p.ewallet)?`${p.ewallet}/${p.account}`:'';
+        const row=document.createElement('tr');
+        row.innerHTML=`<td>${idx+1}</td><td>${p.user}</td><td>${p.type}</td><td>${formatRp(p.amount)}</td><td>${info}</td>
+        <td>${new Date(p.time).toLocaleString()}</td><td class="status-menunggu">${p.status}</td>
+        <td><button class="btn-approve" onclick="approve('${p.id}')">Setujui</button><button class="btn-reject" onclick="reject('${p.id}')">Tolak</button></td>`;
+        pendingTableBody.appendChild(row);
+      });
+    });
+  }
+
+  window.approve = async (id)=>{
+    const txSnap = await get(ref(db,'pendingTransactions/'+id));
+    if(!txSnap.exists()) return;
+    const tx=txSnap.val();
+    const userRef=ref(db,'users/'+tx.user);
+    const userSnap=await get(userRef);
+    if(!userSnap.exists()) return alert('User tidak ditemukan');
+    let saldo=userSnap.val().saldo||0;
+    if(tx.type==='Withdraw'){
+      if(saldo<tx.amount) return alert('Saldo tidak cukup.');
+      saldo-=tx.amount;
+    } else saldo+=tx.amount;
+    await update(userRef,{saldo});
+    await updateHistory(tx,'Sukses');
+    await remove(ref(db,'pendingTransactions/'+id));
+    alert('Transaksi disetujui.');
+  };
+
+  window.reject = async (id)=>{
+    const txSnap = await get(ref(db,'pendingTransactions/'+id));
+    if(!txSnap.exists()) return;
+    const tx=txSnap.val();
+    await updateHistory(tx,'Ditolak');
+    await remove(ref(db,'pendingTransactions/'+id));
+    alert('Transaksi ditolak.');
+  };
+
+  async function updateHistory(tx,status){
+    const hRef=push(ref(db,'history/'+tx.user));
+    await set(hRef,{...tx,status});
+  }
+
+  function renderHistory(u){
+    onValue(ref(db,'history/'+u),snap=>{
+      historyTableBody.innerHTML='';
+      if(!snap.exists()){historyTableBody.innerHTML='<tr><td colspan="5">Belum ada riwayat.</td></tr>';return;}
+      const hist=Object.values(snap.val()).reverse();
+      hist.forEach((h,i)=>{
+        const cls=h.status==='Sukses'?'status-sukses':(h.status==='Ditolak'?'status-ditolak':'status-menunggu');
+        const row=document.createElement('tr');
+        row.innerHTML=`<td>${i+1}</td><td>${h.type}</td><td>${formatRp(h.amount)}</td><td class="${cls}">${h.status}</td><td>${new Date(h.time).toLocaleString()}</td>`;
+        historyTableBody.appendChild(row);
+      });
+    });
+  }
+
+  btnRefresh.onclick=()=>{populateUsers();renderPending();renderHistory(userSelect.value);};
+  function formatRp(n){return'Rp '+Math.round(n).toString().replace(/\B(?=(\d{3})+(?!\d))/g,'.');}
+</script>
 </head>
 <body>
 <div class="card">
-  <h2>Admin Panel - Lengkap</h2>
-
-  <!-- LOGIN -->
+  <h2>Admin Panel - Realtime</h2>
   <div class="login-row" id="loginRow">
     <input id="adminUser" placeholder="admin" value="admin" />
     <input id="adminPass" placeholder="password" type="password" value="1234" />
@@ -49,7 +217,6 @@ input,select{padding:8px;border-radius:6px;border:none;background:#222;color:#ff
       </div>
     </div>
 
-    <!-- FITUR BARU -->
     <div id="userControls" style="margin-top:15px;">
       <button id="btnBan" class="btn-ban">Ban Akun</button>
       <button id="btnSaveSlot" class="btn-save">💾 Simpan Setting Kemenangan</button>
@@ -66,14 +233,12 @@ input,select{padding:8px;border-radius:6px;border:none;background:#222;color:#ff
       </div>
     </div>
 
-    <!-- TRANSAKSI PENDING -->
     <h3 style="margin-top:20px;">Daftar Transaksi Pending</h3>
     <table id="pendingTable">
       <thead><tr><th>#</th><th>User</th><th>Jenis</th><th>Jumlah</th><th>Info</th><th>Waktu</th><th>Status</th><th>Aksi</th></tr></thead>
       <tbody></tbody>
     </table>
 
-    <!-- RIWAYAT -->
     <h3 style="margin-top:20px;">Riwayat User (pilih user)</h3>
     <table id="historyTable">
       <thead><tr><th>#</th><th>Jenis</th><th>Jumlah</th><th>Status</th><th>Waktu</th></tr></thead>
@@ -81,150 +246,5 @@ input,select{padding:8px;border-radius:6px;border:none;background:#222;color:#ff
     </table>
   </div>
 </div>
-
-<script>
-// --- ADMIN LOGIN ---
-const admins = { admin: '1234' };
-const loginRow = document.getElementById('loginRow');
-const btnLogin = document.getElementById('btnLogin');
-const adminArea = document.getElementById('adminArea');
-const userSelect = document.getElementById('userSelect');
-const btnRefresh = document.getElementById('btnRefresh');
-const pendingTableBody = document.querySelector('#pendingTable tbody');
-const historyTableBody = document.querySelector('#historyTable tbody');
-
-function getUsers(){ return JSON.parse(localStorage.getItem('users')||'{}'); }
-function saveUsers(u){ localStorage.setItem('users', JSON.stringify(u)); }
-
-btnLogin.onclick = ()=>{
-  const u = adminUser.value.trim();
-  const p = adminPass.value.trim();
-  if(admins[u]!==p) return alert('Login gagal!');
-  loginRow.style.display='none';
-  adminArea.style.display='block';
-  populateUsers();
-  renderPending();
-};
-
-// --- USER HANDLING ---
-function populateUsers(){
-  const users = getUsers();
-  userSelect.innerHTML='';
-  Object.keys(users).forEach(u=>{
-    const opt=document.createElement('option');
-    opt.value=u;
-    opt.text=u + (users[u].banned?' [BANNED]':'');
-    userSelect.appendChild(opt);
-  });
-  if(userSelect.options.length>0) loadUserSettings(userSelect.value);
-  userSelect.onchange=()=> loadUserSettings(userSelect.value);
-  updateBanButton();
-}
-
-// --- BAN / UNBAN ---
-const btnBan=document.getElementById('btnBan');
-btnBan.onclick=()=>{
-  const users=getUsers(); const u=userSelect.value;
-  if(!u) return;
-  users[u].banned=!users[u].banned;
-  saveUsers(users);
-  alert(users[u].banned?`✅ ${u} telah diblokir.`:`🔓 ${u} telah diaktifkan kembali.`);
-  populateUsers();
-};
-function updateBanButton(){
-  const users=getUsers(); const u=userSelect.value;
-  if(!u) return;
-  btnBan.textContent = users[u].banned ? 'Unban Akun' : 'Ban Akun';
-}
-
-// --- SETTING SLOT ---
-const jackpot=document.getElementById('jackpot'),
-      big=document.getElementById('big'),
-      small=document.getElementById('small'),
-      lose=document.getElementById('lose');
-const vJ=document.getElementById('vJackpot'),
-      vB=document.getElementById('vBig'),
-      vS=document.getElementById('vSmall'),
-      vL=document.getElementById('vLose');
-[jackpot,big,small,lose].forEach(r=>r.oninput=()=>{
-  vJ.textContent=jackpot.value;
-  vB.textContent=big.value;
-  vS.textContent=small.value;
-  vL.textContent=lose.value;
-});
-function loadUserSettings(u){
-  updateBanButton();
-  const sKey='slotSettings_'+u;
-  const s=JSON.parse(localStorage.getItem(sKey)||'{}');
-  jackpot.value=s.jackpot||5; big.value=s.big||20; small.value=s.small||30; lose.value=s.lose||45;
-  vJ.textContent=jackpot.value; vB.textContent=big.value; vS.textContent=small.value; vL.textContent=lose.value;
-}
-document.getElementById('btnSaveSlot').onclick=()=>{
-  const u=userSelect.value; if(!u) return;
-  const data={jackpot:+jackpot.value,big:+big.value,small:+small.value,lose:+lose.value};
-  localStorage.setItem('slotSettings_'+u,JSON.stringify(data));
-  alert('🎰 Setting kemenangan disimpan untuk '+u);
-};
-
-// --- TRANSAKSI PENDING ---
-function renderPending(){
-  const pending=JSON.parse(localStorage.getItem('pendingTransactions')||'[]');
-  pendingTableBody.innerHTML='';
-  if(pending.length===0){ pendingTableBody.innerHTML='<tr><td colspan="8">Belum ada transaksi pending.</td></tr>'; return; }
-  pending.forEach((p,idx)=>{
-    const info=(p.type==='Withdraw'&&p.ewallet)?`${p.ewallet}/${p.account}`:'';
-    const row=document.createElement('tr');
-    row.innerHTML=`<td>${idx+1}</td><td>${p.user}</td><td>${p.type}</td><td>${formatRp(p.amount)}</td><td>${info}</td>
-    <td>${new Date(p.time).toLocaleString()}</td><td class="status-menunggu">${p.status}</td>
-    <td><button class="btn-approve" onclick="approve(${idx})">Setujui</button><button class="btn-reject" onclick="reject(${idx})">Tolak</button></td>`;
-    pendingTableBody.appendChild(row);
-  });
-}
-function approve(i){
-  const pending=JSON.parse(localStorage.getItem('pendingTransactions')||'[]');
-  const tx=pending[i]; if(!tx) return;
-  const users=getUsers();
-  if(!users[tx.user]) return alert('User tidak ditemukan');
-  if(tx.type==='Withdraw'){
-    if((users[tx.user].saldo||0)<tx.amount) return alert('Saldo tidak cukup.');
-    users[tx.user].saldo-=tx.amount;
-  } else users[tx.user].saldo=(users[tx.user].saldo||0)+tx.amount;
-  saveUsers(users);
-  updateHistory(tx,'Sukses');
-  pending.splice(i,1);
-  localStorage.setItem('pendingTransactions',JSON.stringify(pending));
-  alert('Transaksi disetujui.');
-  renderPending(); populateUsers();
-}
-function reject(i){
-  const pending=JSON.parse(localStorage.getItem('pendingTransactions')||'[]');
-  const tx=pending[i]; if(!tx) return;
-  updateHistory(tx,'Ditolak');
-  pending.splice(i,1);
-  localStorage.setItem('pendingTransactions',JSON.stringify(pending));
-  alert('Transaksi ditolak.');
-  renderPending();
-}
-function updateHistory(tx,status){
-  const key='history_'+tx.user;
-  let hist=JSON.parse(localStorage.getItem(key)||'[]');
-  hist.push({...tx,status});
-  localStorage.setItem(key,JSON.stringify(hist));
-}
-function renderHistory(u){
-  historyTableBody.innerHTML='';
-  if(!u) return;
-  const hist=JSON.parse(localStorage.getItem('history_'+u)||'[]');
-  if(hist.length===0){historyTableBody.innerHTML='<tr><td colspan="5">Belum ada riwayat.</td></tr>';return;}
-  hist.slice().reverse().forEach((h,i)=>{
-    const cls=h.status==='Sukses'?'status-sukses':(h.status==='Ditolak'?'status-ditolak':'status-menunggu');
-    const row=document.createElement('tr');
-    row.innerHTML=`<td>${i+1}</td><td>${h.type}</td><td>${formatRp(h.amount)}</td><td class="${cls}">${h.status}</td><td>${new Date(h.time).toLocaleString()}</td>`;
-    historyTableBody.appendChild(row);
-  });
-}
-btnRefresh.onclick=()=>{populateUsers();renderPending();renderHistory(userSelect.value);};
-function formatRp(n){return'Rp '+Math.round(n).toString().replace(/\B(?=(\d{3})+(?!\d))/g,'.');}
-</script>
 </body>
 </html>
