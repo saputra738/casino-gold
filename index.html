@@ -133,7 +133,33 @@ button:hover {
   </div>
 </div>
 
-<script>
+<!-- Firebase SDK -->
+<script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database.js"></script>
+
+<script type="module">
+// ==============================
+// 🔥 KONFIGURASI FIREBASE
+// ==============================
+import { initializeApp } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-app.js";
+import { getDatabase, ref, set, get, child } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-database.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyD7xEXAMPLE",
+  authDomain: "casino-gold.firebaseapp.com",
+  databaseURL: "https://casino-gold-default-rtdb.firebaseio.com",
+  projectId: "casino-gold",
+  storageBucket: "casino-gold.appspot.com",
+  messagingSenderId: "123456789",
+  appId: "1:123456789:web:abc123def456"
+};
+
+const app = initializeApp(firebaseConfig);
+const db = getDatabase(app);
+
+// ==============================
+// SLIDE ANIMASI LOGIN/REGISTER
+// ==============================
 const slideContainer = document.getElementById('slideContainer');
 const showRegister = document.getElementById('showRegister');
 const showLogin = document.getElementById('showLogin');
@@ -141,31 +167,60 @@ const showLogin = document.getElementById('showLogin');
 showRegister.addEventListener('click',()=>{ slideContainer.style.transform='translateX(-50%)'; });
 showLogin.addEventListener('click',()=>{ slideContainer.style.transform='translateX(0)'; });
 
-// LOGIN
-document.getElementById('btnLogin').addEventListener('click',()=>{
-  const u = document.getElementById('loginUsername').value.trim();
-  const p = document.getElementById('loginPassword').value.trim();
-  if(!u || !p){ alert('Masukkan username dan password'); return; }
-  const users = JSON.parse(localStorage.getItem('users')||'{}');
-  if(!users[u]){ alert('Username tidak ditemukan'); return; }
-  if(users[u].password !== p){ alert('Password salah'); return; }
-  localStorage.setItem('currentUser', u);
-  window.location='slot.html';
-});
-
-// REGISTER
-document.getElementById('btnRegister').addEventListener('click',()=>{
+// ==============================
+// DAFTAR AKUN
+// ==============================
+document.getElementById('btnRegister').addEventListener('click', async ()=>{
   const u = document.getElementById('regUsername').value.trim();
   const p = document.getElementById('regPassword').value.trim();
+
   if(!u || !p){ alert('Masukkan username dan password'); return; }
-  const users = JSON.parse(localStorage.getItem('users')||'{}');
-  if(users[u]){ alert('Username sudah terdaftar'); return; }
-  users[u] = {password:p, saldo:0};
-  localStorage.setItem('users', JSON.stringify(users));
-  alert('Akun berhasil dibuat! Silakan login.');
-  slideContainer.style.transform='translateX(0)';
-  document.getElementById('loginUsername').value = u;
-  document.getElementById('loginPassword').value = '';
+
+  const dbRef = ref(db);
+  const snapshot = await get(child(dbRef, "users/" + u));
+
+  if(snapshot.exists()){
+    alert('Username sudah terdaftar');
+  } else {
+    await set(ref(db, "users/" + u), {
+      username: u,
+      password: p,
+      saldo: 0,
+      createdAt: new Date().toISOString()
+    });
+    alert('Akun berhasil dibuat! Silakan login.');
+    slideContainer.style.transform='translateX(0)';
+    document.getElementById('loginUsername').value = u;
+    document.getElementById('loginPassword').value = '';
+  }
+});
+
+// ==============================
+// LOGIN AKUN
+// ==============================
+document.getElementById('btnLogin').addEventListener('click', async ()=>{
+  const u = document.getElementById('loginUsername').value.trim();
+  const p = document.getElementById('loginPassword').value.trim();
+
+  if(!u || !p){ alert('Masukkan username dan password'); return; }
+
+  const dbRef = ref(db);
+  const snapshot = await get(child(dbRef, "users/" + u));
+
+  if(!snapshot.exists()){
+    alert('Username tidak ditemukan');
+    return;
+  }
+
+  const data = snapshot.val();
+  if(data.password !== p){
+    alert('Password salah');
+    return;
+  }
+
+  localStorage.setItem('currentUser', u);
+  alert('Login berhasil!');
+  window.location = 'slot.html';
 });
 </script>
 
