@@ -27,30 +27,28 @@ input,select{padding:8px;border-radius:6px;border:none;background:#222;color:#ff
 .range-box input[type=range]{width:100%;}
 </style>
 
-<!-- Firebase & Script -->
 <script type="module" defer>
-  // ✅ Import Firebase
   import { initializeApp } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-app.js";
-  import { getDatabase, ref, get, set, update, onValue, push, remove } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-database.js";
+  import { getDatabase, ref, get, set, update, onValue, push, remove, child } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-database.js";
 
-  // ✅ Konfigurasi Firebase (sudah diperbaiki)
+  // 🔥 Konfigurasi Firebase yang sama dengan index.html (pastikan pakai project yang sama)
   const firebaseConfig = {
-    apiKey: "AIzaSyDAkDFS1Mp8zAJvXq8P8SkzJnmbZRyHKaY",
-    authDomain: "testingsaja-bb474.firebaseapp.com",
-    projectId: "testingsaja-bb474",
-    storageBucket: "testingsaja-bb474.firebasestorage.app",
-    messagingSenderId: "1068578641763",
-    appId: "1:1068578641763:web:3832c9485c5092df3b6556"
+    apiKey: "AIzaSyD7xEXAMPLE",
+    authDomain: "casino-gold.firebaseapp.com",
+    databaseURL: "https://casino-gold-default-rtdb.firebaseio.com",
+    projectId: "casino-gold",
+    storageBucket: "casino-gold.appspot.com",
+    messagingSenderId: "123456789",
+    appId: "1:123456789:web:abc123def456"
   };
 
-  // ✅ Inisialisasi Firebase
   const app = initializeApp(firebaseConfig);
   const db = getDatabase(app);
 
-  // --- VARIABEL ADMIN (username dan password) ---
+  // === Variabel Admin (sementara statis, bisa pakai auth nanti)
   const admins = { admin: '1234' };
 
-  // --- ELEMENT DOM ---
+  // === Element DOM
   const loginRow = document.getElementById('loginRow');
   const btnLogin = document.getElementById('btnLogin');
   const adminUser = document.getElementById('adminUser');
@@ -62,7 +60,7 @@ input,select{padding:8px;border-radius:6px;border:none;background:#222;color:#ff
   const historyTableBody = document.querySelector('#historyTable tbody');
   const btnBan = document.getElementById('btnBan');
 
-  // --- LOGIN ---
+  // === Login Admin
   btnLogin.onclick = async ()=>{
     const u = adminUser.value.trim();
     const p = adminPass.value.trim();
@@ -73,7 +71,7 @@ input,select{padding:8px;border-radius:6px;border:none;background:#222;color:#ff
     renderPending();
   };
 
-  // --- USERS ---
+  // === Tampilkan User dari Database
   async function populateUsers(){
     const usersSnap = await get(ref(db,'users'));
     const users = usersSnap.exists()?usersSnap.val():{};
@@ -89,7 +87,7 @@ input,select{padding:8px;border-radius:6px;border:none;background:#222;color:#ff
     updateBanButton();
   }
 
-  // --- BAN / UNBAN ---
+  // === Ban / Unban
   btnBan.onclick = async ()=>{
     const u=userSelect.value; if(!u) return;
     const userRef=ref(db,'users/'+u);
@@ -108,7 +106,7 @@ input,select{padding:8px;border-radius:6px;border:none;background:#222;color:#ff
     btnBan.textContent = snap.val().banned ? 'Unban Akun' : 'Ban Akun';
   }
 
-  // --- SETTING SLOT ---
+  // === Setting Slot
   const jackpot=document.getElementById('jackpot'),
         big=document.getElementById('big'),
         small=document.getElementById('small'),
@@ -148,7 +146,7 @@ input,select{padding:8px;border-radius:6px;border:none;background:#222;color:#ff
     alert('🎰 Setting kemenangan disimpan untuk '+u);
   };
 
-  // --- TRANSAKSI PENDING ---
+  // === Pending Transaksi
   function renderPending(){
     onValue(ref(db,'pendingTransactions'),snap=>{
       const pending=snap.exists()?Object.values(snap.val()):[];
