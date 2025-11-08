@@ -113,6 +113,356 @@ html,body{height:100%;background:linear-gradient(180deg,#050505,#0b0606);color:#
   .bet-card{width:100%;}
 }
 </style>
+<!-- Firebase -->
+<script type="module" defer>
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-app.js";
+  import { getDatabase, ref, get, set, update, onValue, push, remove } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-database.js";
+
+  // === GANTI DENGAN CONFIG FIREBASE KAMU (sudah kamu kirim sebelumnya) ===
+  const firebaseConfig = {
+    apiKey: "AIzaSyD7xEXAMPLE",
+    authDomain: "casino-gold.firebaseapp.com",
+    databaseURL: "https://casino-gold-default-rtdb.firebaseio.com",
+    projectId: "casino-gold",
+    storageBucket: "casino-gold.appspot.com",
+    messagingSenderId: "123456789",
+    appId: "1:123456789:web:abc123def456"
+  };
+  // ======================================================================
+
+  const app = initializeApp(firebaseConfig);
+  const db = getDatabase(app);
+
+  // -------- existing logic variables (kept same) ----------
+  const icons = ['🍒','🍋','🍊','🔔','⭐','💎'];
+  let currentUser = localStorage.getItem('currentUser');
+  if(!currentUser){ alert('Login dulu!'); window.location = 'login.html'; }
+
+  // local cache (keperluan UI)
+  let balance = 0;
+  let lastWin = 0;
+  let totalSpins = 0;
+  let spinning = false;
+  let history = [];
+
+  // DOM elements
+  const reelsEls = [...Array(6)].map((_,i)=>document.getElementById('r'+i));
+  const balanceEl = document.getElementById('balance'), lastWinEl = document.getElementById('lastWin'), totalSpinsEl = document.getElementById('totalSpins');
+  const spinBtn = document.getElementById('spinBtn'), betInput = document.getElementById('betInput');
+  const incBtn = document.getElementById('incBtn'), decBtn = document.getElementById('decBtn');
+  const topUpBtn = document.getElementById('topUpBtn'), withdrawBtn = document.getElementById('withdrawBtn');
+  const btnDeleteAccount = document.getElementById('btnDeleteAccount'), logoutBtn = document.getElementById('btnLogout');
+  const betModeRadios = document.getElementsByName('betMode');
+  const toggleRulesBtn = document.getElementById('toggleRulesBtn'), rulesContent = document.getElementById('rulesContent');
+  const historyBtn = document.getElementById('historyBtn');
+
+  document.getElementById('displayUser').innerText = 'User: ' + currentUser;
+
+  // ---------- Firebase helpers ----------
+  const userRef = (u) => ref(db, 'users/' + u);
+  const historyRef = (u) => ref(db, 'history/' + u);
+  const pendingRef = () => ref(db, 'pendingTransactions');
+  const slotSettingsRef = (u) => ref(db, 'slotSettings/' + u);
+
+  async function loadUserRealtime(){
+    // listen realtime to user node
+    onValue(userRef(currentUser), snap => {
+      if(!snap.exists()){
+        alert('Akun tidak ditemukan (hapus atau belum dibuat).'); localStorage.removeItem('currentUser'); window.location='login.html'; return;
+      }
+      const data = snap.val();
+      if(data.banned){
+        alert('Akun diblokir!'); localStorage.removeItem('currentUser'); window.location='login.html'; return;
+      }
+      balance = data.saldo || 0;
+      // optionally preserve lastWin/totalSpins if stored
+      lastWin = data.lastWin || 0;
+      totalSpins = data.totalSpins || 0;
+      updateUI();
+    });
+
+    // listen history realtime (cache locally)
+    onValue(historyRef(currentUser), snap => {
+      history = snap.exists()? Object.values(snap.val()) : [];
+      // UI depends on history when modal open; updateUI will handle display values
+    });
+  }
+
+  async function saveUserToFirebase(){
+    // update saldo + lastWin + totalSpins for server
+    const uRef = userRef(currentUser);
+    await update(uRef, { saldo: balance, lastWin: lastWin, totalSpins: totalSpins });
+  }
+
+  async function pushHistoryToFirebase(tx){
+    const hRef = push(historyRef(currentUser));
+    await set(hRef, { ...tx, id: hRef.key });
+  }
+
+  async function pushPendingToFirebase(tx){
+    const pRef = push(pendingRef());
+    await set(pRef, { ...tx, id: pRef.key });
+  }
+
+  async function removePendingByUser(user){
+    const snap = await get(pendingRef());
+    if(!snap.exists()) return;
+    const obj = snap.val();
+    for(const key of Object.keys(obj)){
+      if(obj[key].user === user){
+        await remove(ref(db, 'pendingTransactions/' + key));
+      }
+    }
+  }
+
+  // ---------- UI helpers (kept same naming) ----------
+  function formatRp(n){ return 'Rp ' + Math.round(n).toString().replace(/\B(?=(\d{3})+(?!\d))/g,'.'); }
+  function rndIndex(){ return Math.floor(Math.random()*icons.length); }
+  function updateUI(){ balanceEl.textContent = formatRp(balance); lastWinEl.textContent = formatRp(lastWin); totalSpinsEl.textContent = totalSpins; document.getElementById('betDisplay').innerText = formatRp(Number(betInput.value||0)); }
+
+  // ---------- Game logic (unchanged) ----------
+  function payout(indices, stake){
+    const counts = {};
+    indices.forEach(i => counts[i] = (counts[i]||0) + 1);
+    const values = Object.values(counts).sort((a,b)=>b-a);
+    const topCount = values[0] || 0;
+    const topSymbol = Number(Object.keys(counts).find(k => counts[k] === topCount));
+    if(topCount === 6 && topSymbol === 5) return stake * 20; // diamond x20
+    if(topCount === 6 && topSymbol === 4) return stake * 10; // star x10
+    if(topCount === 6) return stake * 6;
+    if(topCount === 5) return stake * 5;
+    if(topCount === 3) return stake * 3;
+    if(topCount === 2) return stake * 2;
+    return 0;
+  }
+  function shuffle(a){ for(let i=a.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [a[i],a[j]]=[a[j],a[i]];} return a; }
+  function finalForDiamond(){ return [5,5,5,5,5,5]; }
+  function finalForStar(){ return [4,4,4,4,4,4]; }
+  function finalForBig(){ const idx=rndIndex(); return [idx,idx,idx,idx,idx,idx]; }
+  function finalForSmall(){ const pair = rndIndex(); const others=[]; while(others.length<4){ const r=rndIndex(); if(r===pair||others.includes(r)) continue; others.push(r);} return shuffle([pair,pair,others[0],others[1],others[2],others[3]]); }
+  function finalForLose(){ const s=new Set(); while(s.size<6) s.add(rndIndex()); return Array.from(s); }
+  function quickSpinTick(reels, tickCount=18, delay=45){
+    return new Promise(resolve=>{
+      let t=0;
+      const iv = setInterval(()=>{
+        reels.forEach(el => el.querySelector('.symbol').textContent = icons[rndIndex()]);
+        if(++t >= tickCount){ clearInterval(iv); resolve(); }
+      }, delay);
+    });
+  }
+
+  /* Audio: same as before */
+  const AudioCtx = window.AudioContext || window.webkitAudioContext;
+  let audioCtx;
+  try{ audioCtx = new AudioCtx(); } catch(e){ audioCtx = null; }
+  function playTone(freq, type='sine', duration=0.12, gain=0.08){
+    if(!audioCtx) return;
+    const o = audioCtx.createOscillator();
+    const g = audioCtx.createGain();
+    o.type = type; o.frequency.value = freq; o.connect(g); g.connect(audioCtx.destination);
+    g.gain.value = 0; o.start();
+    g.gain.linearRampToValueAtTime(gain, audioCtx.currentTime + 0.01);
+    g.gain.linearRampToValueAtTime(0.0001, audioCtx.currentTime + duration);
+    o.stop(audioCtx.currentTime + duration + 0.02);
+  }
+  function playClick(){ playTone(900,'square',0.04,0.06); }
+  function playLose(){ playTone(140,'sine',0.22,0.09); setTimeout(()=>playTone(90,'sine',0.18,0.08),160); }
+  function playWinSmall(){ playTone(520,'triangle',0.12,0.12); setTimeout(()=>playTone(620,'triangle',0.11,0.1),120); }
+  function playWinBig(){ playTone(720,'sine',0.14,0.12); setTimeout(()=>playTone(840,'sine',0.14,0.12),140); }
+  function playJackpot(){ playTone(1100,'sawtooth',0.16,0.16); setTimeout(()=>playTone(1300,'sawtooth',0.18,0.18),140); }
+
+  // ---------- Main spin function (adapted to save to Firebase) ----------
+  async function spin(){
+    if(spinning) return;
+    const mode = [...betModeRadios].find(r=>r.checked)?.value;
+    let bet = Math.max(1000, Math.round(Number(betInput.value) || 0));
+    if(mode === 'max'){ bet = balance; betInput.value = bet; }
+    if(bet > balance){ alert('Saldo tidak cukup.'); return; }
+
+    spinning = true;
+    spinBtn.disabled = true;
+    playClick();
+
+    // deduct immediately (same behavior)
+    balance -= bet;
+    updateUI();
+    await saveUserToFirebase();
+
+    reelsEls.forEach(el => el.classList.add('spin'));
+    await quickSpinTick(reelsEls, 20, 40);
+
+    // load admin settings from realtime DB
+    let sSnap = await get(slotSettingsRef(currentUser));
+    let jackpot = 5, big = 20, small = 30, lose = 45;
+    if(sSnap.exists()){
+      const s = sSnap.val();
+      jackpot = s.jackpot ?? jackpot;
+      big = s.big ?? big;
+      small = s.small ?? small;
+      lose = s.lose ?? lose;
+    }
+    let total = jackpot + big + small + lose;
+    if(total <= 0){ jackpot = 5; big = 20; small = 30; lose = 45; total = 100; }
+    if(total > 100){
+      const scale = 100 / total;
+      jackpot = Math.max(0, Math.round(jackpot * scale));
+      big = Math.max(0, Math.round(big * scale));
+      small = Math.max(0, Math.round(small * scale));
+      lose = Math.max(0, 100 - (jackpot + big + small));
+    }
+
+    const roll = Math.random() * 100;
+    let finalArr;
+    if(roll < jackpot){
+      finalArr = Math.random() < 0.6 ? finalForDiamond() : finalForStar();
+    } else if(roll < jackpot + big){
+      finalArr = finalForBig();
+    } else if(roll < jackpot + big + small){
+      finalArr = finalForSmall();
+    } else {
+      finalArr = finalForLose();
+    }
+
+    // reveal results sequentially with glow on winners
+    for(let i=0;i<reelsEls.length;i++){
+      const sym = reelsEls[i].querySelector('.symbol');
+      sym.textContent = icons[finalArr[i]];
+      reelsEls[i].classList.add('win');
+      // subtle glow
+      await new Promise(r => setTimeout(r, 110));
+      reelsEls[i].classList.remove('win');
+    }
+
+    const win = payout(finalArr, bet);
+    if(win > 0){
+      balance += win;
+      await saveUserToFirebase();
+      if(win >= bet * 20){ playJackpot(); spinBtn.textContent = '💎 JACKPOT!'; }
+      else if(win >= bet * 10){ playWinBig(); spinBtn.textContent = 'MENANG BESAR!'; }
+      else { playWinSmall(); spinBtn.textContent = 'MENANG!'; }
+      // add glow on all winning reels for effect
+      reelsEls.forEach((el, idx) => {
+        const counts = {};
+        finalArr.forEach(i => counts[i] = (counts[i]||0)+1);
+        const topCount = Math.max(...Object.values(counts));
+        const topSymbol = Number(Object.keys(counts).find(k => counts[k]===topCount));
+        if(finalArr[idx] === topSymbol) el.classList.add('win');
+      });
+      setTimeout(()=> reelsEls.forEach(el=>el.classList.remove('win')), 1400);
+    } else {
+      playLose();
+      spinBtn.textContent = 'KALAH';
+    }
+
+    lastWin = win;
+    totalSpins++;
+    updateUI();
+
+    // write history entry to Firebase
+    const tx = { user: currentUser, type: 'Spin', amount: win, stake: bet, status: (win>0?'Sukses':'Kalah'), time: Date.now() };
+    await pushHistoryToFirebase(tx);
+
+    // reset states
+    setTimeout(()=>{
+      reelsEls.forEach(el => el.classList.remove('spin'));
+      spinBtn.textContent = 'PUTAR';
+      spinBtn.disabled = false;
+      spinning = false;
+    }, 1200);
+  }
+
+  // ---------- Top-up & Withdraw (push to pending in Firebase) ----------
+  function formatNumberInput(v){ return Math.round(Number(v)) || 0; }
+
+  async function topUpFlow(){
+    const preset = prompt("Masukkan nominal isi saldo (contoh: 10000):","10000");
+    if(preset === null) return;
+    const amt = formatNumberInput(preset);
+    if(amt <= 0){ alert("Nominal tidak valid."); return; }
+    const tx = { user: currentUser, type: 'Top Up', amount: amt, status: 'Menunggu', time: Date.now() };
+    await pushPendingToFirebase(tx);
+    await pushHistoryToFirebase(tx); // also store in history
+    alert("✅ Permintaan isi ulang terkirim. Menunggu persetujuan admin.");
+  }
+
+  async function withdrawFlow(){
+    const ewallet = prompt("Nama e-wallet (misal: DANA / OVO / GOPAY):","DANA");
+    if(ewallet === null) return;
+    const account = prompt("Masukkan nomor akun "+ewallet+":","");
+    if(account === null || account.trim() === ''){ alert("Nomor akun wajib diisi."); return; }
+    const nominal = prompt("Masukkan nominal tarik (contoh: 50000):","50000");
+    if(nominal === null) return;
+    const amt = formatNumberInput(nominal);
+    if(amt <= 0){ alert("Nominal tidak valid."); return; }
+    if(amt > balance){ alert("Saldo tidak cukup!"); return; }
+    const tx = { user: currentUser, type: 'Withdraw', amount: amt, status: 'Menunggu', time: Date.now(), ewallet: ewallet, account: account };
+    await pushPendingToFirebase(tx);
+    await pushHistoryToFirebase(tx);
+    alert("✅ Permintaan tarik terkirim. Menunggu persetujuan admin.");
+  }
+
+  // ---------- History modal (read from Firebase) ----------
+  function showHistory(){
+    const modal = document.getElementById('riwayatModal');
+    const tbody = document.querySelector('#riwayatTable tbody');
+    // get current history snapshot from cache (history variable) which is updated via onValue
+    tbody.innerHTML = '';
+    if(!history || history.length === 0){
+      tbody.innerHTML = `<tr><td colspan="4">Belum ada riwayat.</td></tr>`;
+    } else {
+      history.slice().reverse().forEach(r=>{
+        const cls = r.status==='Menunggu' ? 'status-menunggu' : (r.status==='Sukses' ? 'status-sukses' : (r.status==='Kalah'?'status-ditolak':''));
+        const time = new Date(r.time).toLocaleString();
+        tbody.innerHTML += `<tr>
+          <td>${r.type}</td>
+          <td>${formatRp(r.amount)}</td>
+          <td class="${cls}">${r.status}</td>
+          <td>${time}</td>
+        </tr>`;
+      });
+    }
+    modal.style.display = 'flex';
+  }
+  function closeRiwayat(){ document.getElementById('riwayatModal').style.display = 'none'; }
+
+  // ---------- Delete account (remove user & history & pending entries) ----------
+  async function deleteAccount(){
+    if(confirm('Apakah Anda yakin ingin menghapus akun ini? Semua data akan hilang.')){
+      // remove user
+      await remove(userRef(currentUser));
+      // remove history
+      await remove(historyRef(currentUser));
+      // remove pending for this user
+      await removePendingByUser(currentUser);
+      localStorage.removeItem('currentUser');
+      alert('Akun telah dihapus.');
+      window.location = 'daftar.html';
+    }
+  }
+
+  // ---------- Events bindings ----------
+  document.addEventListener('DOMContentLoaded', ()=>{
+    topUpBtn.addEventListener('click', topUpFlow);
+    withdrawBtn.addEventListener('click', withdrawFlow);
+    historyBtn.addEventListener('click', showHistory);
+    document.getElementById('btnDeleteAccount').addEventListener('click', deleteAccount);
+    document.getElementById('btnLogout').addEventListener('click', ()=>{ localStorage.removeItem('currentUser'); window.location='login.html'; });
+    spinBtn.addEventListener('click', spin);
+    incBtn.addEventListener('click', ()=>{ betInput.value = Math.max(1000, Math.round(Number(betInput.value)||0)) + 1000; updateUI(); });
+    decBtn.addEventListener('click', ()=>{ betInput.value = Math.max(1000, Math.round(Number(betInput.value)||0) - 1000); updateUI(); });
+    betInput.addEventListener('input', ()=>{ let v = Math.round(Number(betInput.value)||0); if(!v || v < 1000) v = 1000; betInput.value = v; updateUI(); });
+    toggleRulesBtn?.addEventListener('click', ()=>{
+      rulesContent.classList.toggle('show');
+      toggleRulesBtn.textContent = rulesContent.classList.contains('show') ? 'Sembunyikan Rules' : 'Tampilkan Rules';
+    });
+
+    // initial load: listen user and history realtime
+    loadUserRealtime().catch(err=>{ console.error(err); alert('Gagal konek ke database.'); });
+    updateUI();
+  });
+
+  // No window.storage listener needed — Firebase realtime handles sync between clients
+</script>
 </head>
 <body>
 <div class="page">
@@ -194,310 +544,5 @@ html,body{height:100%;background:linear-gradient(180deg,#050505,#0b0606);color:#
     <div style="text-align:right;margin-top:10px;"><button onclick="closeRiwayat()" class="btn">Tutup</button></div>
   </div>
 </div>
-
-<script>
-/* --------------------------
-   LOGIKA UTAMA (6 REEL) — Semua fitur asli dipertahankan.
-   - Diamond (index 5) jackpot x20
-   - Top-up / Withdraw -> pending (tidak langsung mengurangi/menambah saldo)
-   - Riwayat disimpan di localStorage('history_'+user)
-   - Storage listener untuk sync admin tab
-   -------------------------- */
-
-const icons = ['🍒','🍋','🍊','🔔','⭐','💎'];
-
-let currentUser = localStorage.getItem('currentUser');
-let users = JSON.parse(localStorage.getItem('users') || '{}');
-if(!currentUser || !users[currentUser]){
-  alert('Login dulu!'); window.location = 'login.html';
-}
-if(users[currentUser]?.banned){
-  alert('Akun diblokir!'); localStorage.removeItem('currentUser'); window.location='login.html';
-}
-
-let balance = users[currentUser].saldo || 0;
-let lastWin = 0;
-let totalSpins = 0;
-let spinning = false;
-let history = JSON.parse(localStorage.getItem('history_' + currentUser) || '[]');
-
-/* Elements */
-const reelsEls = [...Array(6)].map((_,i)=>document.getElementById('r'+i));
-const balanceEl = document.getElementById('balance'), lastWinEl = document.getElementById('lastWin'), totalSpinsEl = document.getElementById('totalSpins');
-const spinBtn = document.getElementById('spinBtn'), betInput = document.getElementById('betInput');
-const incBtn = document.getElementById('incBtn'), decBtn = document.getElementById('decBtn');
-const topUpBtn = document.getElementById('topUpBtn'), withdrawBtn = document.getElementById('withdrawBtn');
-const btnDeleteAccount = document.getElementById('btnDeleteAccount'), logoutBtn = document.getElementById('btnLogout');
-const betModeRadios = document.getElementsByName('betMode');
-const toggleRulesBtn = document.getElementById('toggleRulesBtn'), rulesContent = document.getElementById('rulesContent');
-const historyBtn = document.getElementById('historyBtn');
-
-document.getElementById('displayUser').innerText = 'User: ' + currentUser;
-
-function saveUser(){ users[currentUser].saldo = balance; localStorage.setItem('users', JSON.stringify(users)); }
-function formatRp(n){ return 'Rp ' + Math.round(n).toString().replace(/\B(?=(\d{3})+(?!\d))/g,'.'); }
-function rndIndex(){ return Math.floor(Math.random()*icons.length); }
-function updateUI(){ balanceEl.textContent = formatRp(balance); lastWinEl.textContent = formatRp(lastWin); totalSpinsEl.textContent = totalSpins; document.getElementById('betDisplay').innerText = formatRp(Number(betInput.value||0)); }
-
-/* Bet mode */
-function updateBetMode(){
-  const mode = [...betModeRadios].find(r=>r.checked)?.value;
-  if(mode === 'max'){ betInput.value = Math.max(0, balance); }
-  updateUI();
-}
-[...betModeRadios].forEach(r=>r.addEventListener('change', updateBetMode));
-
-/* Rules toggle */
-toggleRulesBtn?.addEventListener('click', ()=>{
-  rulesContent.classList.toggle('show');
-  toggleRulesBtn.textContent = rulesContent.classList.contains('show') ? 'Sembunyikan Rules' : 'Tampilkan Rules';
-});
-
-/* Audio: simple tones */
-const AudioCtx = window.AudioContext || window.webkitAudioContext;
-let audioCtx;
-try{ audioCtx = new AudioCtx(); } catch(e){ audioCtx = null; }
-function playTone(freq, type='sine', duration=0.12, gain=0.08){
-  if(!audioCtx) return;
-  const o = audioCtx.createOscillator();
-  const g = audioCtx.createGain();
-  o.type = type; o.frequency.value = freq; o.connect(g); g.connect(audioCtx.destination);
-  g.gain.value = 0; o.start();
-  g.gain.linearRampToValueAtTime(gain, audioCtx.currentTime + 0.01);
-  g.gain.linearRampToValueAtTime(0.0001, audioCtx.currentTime + duration);
-  o.stop(audioCtx.currentTime + duration + 0.02);
-}
-function playClick(){ playTone(900,'square',0.04,0.06); }
-function playLose(){ playTone(140,'sine',0.22,0.09); setTimeout(()=>playTone(90,'sine',0.18,0.08),160); }
-function playWinSmall(){ playTone(520,'triangle',0.12,0.12); setTimeout(()=>playTone(620,'triangle',0.11,0.1),120); }
-function playWinBig(){ playTone(720,'sine',0.14,0.12); setTimeout(()=>playTone(840,'sine',0.14,0.12),140); }
-function playJackpot(){ playTone(1100,'sawtooth',0.16,0.16); setTimeout(()=>playTone(1300,'sawtooth',0.18,0.18),140); }
-
-/* Payout rules (6 reels) */
-function payout(indices, stake){
-  const counts = {};
-  indices.forEach(i => counts[i] = (counts[i]||0) + 1);
-  const values = Object.values(counts).sort((a,b)=>b-a);
-  const topCount = values[0] || 0;
-  const topSymbol = Number(Object.keys(counts).find(k => counts[k] === topCount));
-  if(topCount === 6 && topSymbol === 5) return stake * 20; // diamond x20
-  if(topCount === 6 && topSymbol === 4) return stake * 10; // star x10
-  if(topCount === 6) return stake * 6;
-  if(topCount === 5) return stake * 5;
-  if(topCount === 3) return stake * 3;
-  if(topCount === 2) return stake * 2;
-  return 0;
-}
-
-function shuffle(a){ for(let i=a.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [a[i],a[j]]=[a[j],a[i]];} return a; }
-function finalForDiamond(){ return [5,5,5,5,5,5]; }
-function finalForStar(){ return [4,4,4,4,4,4]; }
-function finalForBig(){ const idx=rndIndex(); return [idx,idx,idx,idx,idx,idx]; }
-function finalForSmall(){ const pair = rndIndex(); const others=[]; while(others.length<4){ const r=rndIndex(); if(r===pair||others.includes(r)) continue; others.push(r);} return shuffle([pair,pair,others[0],others[1],others[2],others[3]]); }
-function finalForLose(){ const s=new Set(); while(s.size<6) s.add(rndIndex()); return Array.from(s); }
-
-/* quick random tick animation */
-function quickSpinTick(reels, tickCount=18, delay=45){
-  return new Promise(resolve=>{
-    let t=0;
-    const iv = setInterval(()=>{
-      reels.forEach(el => el.querySelector('.symbol').textContent = icons[rndIndex()]);
-      if(++t >= tickCount){ clearInterval(iv); resolve(); }
-    }, delay);
-  });
-}
-
-/* main spin function */
-async function spin(){
-  if(spinning) return;
-  const mode = [...betModeRadios].find(r=>r.checked)?.value;
-  let bet = Math.max(1000, Math.round(Number(betInput.value) || 0));
-  if(mode === 'max'){ bet = balance; betInput.value = bet; }
-  if(bet > balance){ alert('Saldo tidak cukup.'); return; }
-
-  spinning = true;
-  spinBtn.disabled = true;
-  playClick();
-
-  // deduct immediately (as original)
-  balance -= bet;
-  updateUI();
-  saveUser();
-
-  reelsEls.forEach(el => el.classList.add('spin'));
-  await quickSpinTick(reelsEls, 20, 40);
-
-  // load admin settings (slotSettings_user)
-  const key = 'slotSettings_' + currentUser;
-  const s = JSON.parse(localStorage.getItem(key) || '{}');
-  let jackpot = s.jackpot ?? 5, big = s.big ?? 20, small = s.small ?? 30, lose = s.lose ?? 45;
-  let total = jackpot + big + small + lose;
-  if(total <= 0){ jackpot = 5; big = 20; small = 30; lose = 45; total = 100; }
-  if(total > 100){
-    const scale = 100 / total;
-    jackpot = Math.max(0, Math.round(jackpot * scale));
-    big = Math.max(0, Math.round(big * scale));
-    small = Math.max(0, Math.round(small * scale));
-    lose = Math.max(0, 100 - (jackpot + big + small));
-  }
-
-  const roll = Math.random() * 100;
-  let finalArr;
-  if(roll < jackpot){
-    finalArr = Math.random() < 0.6 ? finalForDiamond() : finalForStar();
-  } else if(roll < jackpot + big){
-    finalArr = finalForBig();
-  } else if(roll < jackpot + big + small){
-    finalArr = finalForSmall();
-  } else {
-    finalArr = finalForLose();
-  }
-
-  // reveal results sequentially with glow on winners
-  for(let i=0;i<reelsEls.length;i++){
-    const sym = reelsEls[i].querySelector('.symbol');
-    sym.textContent = icons[finalArr[i]];
-    reelsEls[i].classList.add('win');
-    // subtle glow
-    await new Promise(r => setTimeout(r, 110));
-    reelsEls[i].classList.remove('win');
-  }
-
-  const win = payout(finalArr, bet);
-  if(win > 0){
-    balance += win;
-    saveUser();
-    if(win >= bet * 20){ playJackpot(); spinBtn.textContent = '💎 JACKPOT!'; }
-    else if(win >= bet * 10){ playWinBig(); spinBtn.textContent = 'MENANG BESAR!'; }
-    else { playWinSmall(); spinBtn.textContent = 'MENANG!'; }
-    // add glow on all winning reels for effect
-    reelsEls.forEach((el, idx) => {
-      const counts = {};
-      finalArr.forEach(i => counts[i] = (counts[i]||0)+1);
-      const topCount = Math.max(...Object.values(counts));
-      // highlight reels that match the top symbol
-      const topSymbol = Number(Object.keys(counts).find(k => counts[k]===topCount));
-      if(finalArr[idx] === topSymbol) el.classList.add('win');
-    });
-    setTimeout(()=> reelsEls.forEach(el=>el.classList.remove('win')), 1400);
-  } else {
-    playLose();
-    spinBtn.textContent = 'KALAH';
-  }
-
-  lastWin = win;
-  totalSpins++;
-  updateUI();
-
-  // reset states
-  setTimeout(()=>{
-    reelsEls.forEach(el => el.classList.remove('spin'));
-    spinBtn.textContent = 'PUTAR';
-    spinBtn.disabled = false;
-    spinning = false;
-  }, 1200);
-}
-
-/* Top-up & Withdraw (pending behavior preserved) */
-function formatNumberInput(v){ return Math.round(Number(v)) || 0; }
-
-function topUpFlow(){
-  const preset = prompt("Masukkan nominal isi saldo (contoh: 10000):","10000");
-  if(preset === null) return;
-  const amt = formatNumberInput(preset);
-  if(amt <= 0){ alert("Nominal tidak valid."); return; }
-  const tx = { user: currentUser, type: 'Top Up', amount: amt, status: 'Menunggu', time: Date.now() };
-  const pending = JSON.parse(localStorage.getItem('pendingTransactions') || '[]');
-  pending.push(tx);
-  localStorage.setItem('pendingTransactions', JSON.stringify(pending));
-  history.push(tx);
-  localStorage.setItem('history_' + currentUser, JSON.stringify(history));
-  alert("✅ Permintaan isi ulang terkirim. Menunggu persetujuan admin.");
-}
-
-function withdrawFlow(){
-  const ewallet = prompt("Nama e-wallet (misal: DANA / OVO / GOPAY):","DANA");
-  if(ewallet === null) return;
-  const account = prompt("Masukkan nomor akun "+ewallet+":","");
-  if(account === null || account.trim() === ''){ alert("Nomor akun wajib diisi."); return; }
-  const nominal = prompt("Masukkan nominal tarik (contoh: 50000):","50000");
-  if(nominal === null) return;
-  const amt = formatNumberInput(nominal);
-  if(amt <= 0){ alert("Nominal tidak valid."); return; }
-  if(amt > balance){ alert("Saldo tidak cukup!"); return; }
-  const tx = { user: currentUser, type: 'Withdraw', amount: amt, status: 'Menunggu', time: Date.now(), ewallet: ewallet, account: account };
-  const pending = JSON.parse(localStorage.getItem('pendingTransactions') || '[]');
-  pending.push(tx);
-  localStorage.setItem('pendingTransactions', JSON.stringify(pending));
-  history.push(tx);
-  localStorage.setItem('history_' + currentUser, JSON.stringify(history));
-  alert("✅ Permintaan tarik terkirim. Menunggu persetujuan admin.");
-}
-
-/* History modal */
-function showHistory(){
-  const modal = document.getElementById('riwayatModal');
-  const tbody = document.querySelector('#riwayatTable tbody');
-  const riwayat = JSON.parse(localStorage.getItem('history_'+currentUser) || '[]');
-  tbody.innerHTML = '';
-  if(riwayat.length === 0){
-    tbody.innerHTML = `<tr><td colspan="4">Belum ada riwayat.</td></tr>`;
-  } else {
-    riwayat.slice().reverse().forEach(r=>{
-      const cls = r.status==='Menunggu' ? 'status-menunggu' : (r.status==='Sukses' ? 'status-sukses' : 'status-ditolak');
-      const time = new Date(r.time).toLocaleString();
-      tbody.innerHTML += `<tr>
-        <td>${r.type}</td>
-        <td>${formatRp(r.amount)}</td>
-        <td class="${cls}">${r.status}</td>
-        <td>${time}</td>
-      </tr>`;
-    });
-  }
-  modal.style.display = 'flex';
-}
-function closeRiwayat(){ document.getElementById('riwayatModal').style.display = 'none'; }
-
-/* Delete account (unchanged) */
-function deleteAccount(){
-  if(confirm('Apakah Anda yakin ingin menghapus akun ini? Semua data akan hilang.')){
-    delete users[currentUser];
-    localStorage.setItem('users', JSON.stringify(users));
-    localStorage.removeItem('currentUser');
-    localStorage.removeItem('history_'+currentUser);
-    let pending = JSON.parse(localStorage.getItem('pendingTransactions') || '[]');
-    pending = pending.filter(p => p.user !== currentUser);
-    localStorage.setItem('pendingTransactions', JSON.stringify(pending));
-    alert('Akun telah dihapus.');
-    window.location = 'daftar.html';
-  }
-}
-
-/* Events bindings */
-document.addEventListener('DOMContentLoaded', ()=>{
-  topUpBtn.addEventListener('click', topUpFlow);
-  withdrawBtn.addEventListener('click', withdrawFlow);
-  historyBtn.addEventListener('click', showHistory);
-  document.getElementById('btnDeleteAccount').addEventListener('click', deleteAccount);
-  document.getElementById('btnLogout').addEventListener('click', ()=>{ localStorage.removeItem('currentUser'); window.location='login.html'; });
-  spinBtn.addEventListener('click', spin);
-  incBtn.addEventListener('click', ()=>{ betInput.value = Math.max(1000, Math.round(Number(betInput.value)||0)) + 1000; updateUI(); });
-  decBtn.addEventListener('click', ()=>{ betInput.value = Math.max(1000, Math.round(Number(betInput.value)||0) - 1000); updateUI(); });
-  betInput.addEventListener('input', ()=>{ let v = Math.round(Number(betInput.value)||0); if(!v || v < 1000) v = 1000; betInput.value = v; updateUI(); });
-  updateUI();
-});
-
-/* Storage listener to sync with admin tab */
-window.addEventListener('storage', (ev)=>{
-  if(ev.key === 'users' || (ev.key && ev.key.startsWith('history_')) || ev.key === 'pendingTransactions'){
-    users = JSON.parse(localStorage.getItem('users') || '{}');
-    balance = users[currentUser]?.saldo || 0;
-    history = JSON.parse(localStorage.getItem('history_'+currentUser) || '[]');
-    updateUI();
-    const modal = document.getElementById('riwayatModal');
-    if(modal.style.display === 'flex') showHistory();
-  }
-});
-</script>
 </body>
 </html>
