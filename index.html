@@ -2,147 +2,11 @@
 <html lang="id">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Login & Daftar Akun</title>
-<style>
-body {
-  margin: 0;
-  height: 100vh;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  background: radial-gradient(circle at center, #111 0%, #000 100%);
-  font-family: "Poppins", sans-serif;
-  color: #fff;
-  overflow: hidden;
-}
-.container {
-  width: 340px;
-  background: linear-gradient(180deg, rgba(20,20,20,0.95), rgba(0,0,0,0.9));
-  border: 1px solid #444;
-  border-radius: 16px;
-  box-shadow: 0 0 25px rgba(255,215,0,0.2);
-  overflow: hidden;
-  position: relative;
-}
-.header {
-  text-align: center;
-  padding: 15px 0 5px;
-}
-.header h1 {
-  font-size: 20px;
-  font-weight: 600;
-  color: #ffd700;
-  margin: 0;
-  letter-spacing: 1px;
-  text-shadow: 0 0 5px #b8860b;
-}
-.slide {
-  width: 200%;
-  display: flex;
-  transition: transform 0.5s ease-in-out;
-}
-.box {
-  width: 50%;
-  padding: 20px;
-  box-sizing: border-box;
-}
-h2 {
-  margin-top: 10px;
-  color: #ffd700;
-  text-align: center;
-  font-weight: 500;
-  font-size: 18px;
-}
-input {
-  width: 100%;
-  padding: 10px;
-  margin: 10px 0;
-  border: 1px solid #444;
-  border-radius: 8px;
-  background: #111;
-  color: #ffd;
-  font-size: 14px;
-  outline: none;
-  transition: 0.3s;
-}
-input:focus {
-  border-color: #ffd700;
-  box-shadow: 0 0 8px rgba(255,215,0,0.3);
-}
-button {
-  width: 100%;
-  padding: 10px;
-  margin-top: 10px;
-  border: none;
-  border-radius: 8px;
-  background: linear-gradient(90deg, #b8860b, #ffd700);
-  color: #111;
-  font-weight: 600;
-  cursor: pointer;
-  font-size: 15px;
-  letter-spacing: 0.5px;
-  transition: transform 0.2s;
-}
-button:hover {
-  transform: scale(1.05);
-  background: linear-gradient(90deg, #ffcc00, #ffe066);
-}
-.link {
-  text-align: center;
-  margin-top: 12px;
-  font-size: 13px;
-  color: #bbb;
-}
-.link a {
-  color: #ffd700;
-  cursor: pointer;
-  text-decoration: none;
-}
-.link a:hover {
-  text-decoration: underline;
-}
-</style>
-</head>
-<body>
-
-<div class="container">
-  <div class="header"><h1>CASINO GOLD</h1></div>
-  <div class="slide" id="slideContainer">
-    <!-- LOGIN -->
-    <div class="box">
-      <h2>Masuk Akun</h2>
-      <input type="text" id="loginUsername" placeholder="Username" required>
-      <input type="password" id="loginPassword" placeholder="Password" required>
-      <button id="btnLogin">Login</button>
-      <div class="link">
-        <a id="showRegister">Belum punya akun? Daftar</a>
-      </div>
-    </div>
-
-    <!-- REGISTER -->
-    <div class="box">
-      <h2>Buat Akun Baru</h2>
-      <input type="text" id="regUsername" placeholder="Username" required>
-      <input type="password" id="regPassword" placeholder="Password" required>
-      <button id="btnRegister">Daftar</button>
-      <div class="link">
-        <a id="showLogin">Sudah punya akun? Login</a>
-      </div>
-    </div>
-  </div>
-</div>
-
-<!-- Firebase SDK -->
-<script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app.js"></script>
-<script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database.js"></script>
-
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Casino Gold - Login</title>
 <script type="module">
-// ==============================
-// 🔥 KONFIGURASI FIREBASE
-// ==============================
-import { initializeApp } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-app.js";
-import { getDatabase, ref, set, get, child } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-database.js";
+import { initializeApp } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-app.js";
+import { getDatabase, ref, set, get, child } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-database.js";
 
 const firebaseConfig = {
   apiKey: "AIzaSyD7xEXAMPLE",
@@ -154,75 +18,89 @@ const firebaseConfig = {
   appId: "1:123456789:web:abc123def456"
 };
 
+// Inisialisasi Firebase
 const app = initializeApp(firebaseConfig);
 const db = getDatabase(app);
 
-// ==============================
-// SLIDE ANIMASI LOGIN/REGISTER
-// ==============================
-const slideContainer = document.getElementById('slideContainer');
-const showRegister = document.getElementById('showRegister');
-const showLogin = document.getElementById('showLogin');
+document.addEventListener("DOMContentLoaded", () => {
+  const daftarForm = document.getElementById("daftarForm");
+  const loginForm = document.getElementById("loginForm");
 
-showRegister.addEventListener('click',()=>{ slideContainer.style.transform='translateX(-50%)'; });
-showLogin.addEventListener('click',()=>{ slideContainer.style.transform='translateX(0)'; });
+  // Fungsi daftar
+  daftarForm.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const user = document.getElementById("regUser").value.trim();
+    const pass = document.getElementById("regPass").value.trim();
 
-// ==============================
-// DAFTAR AKUN
-// ==============================
-document.getElementById('btnRegister').addEventListener('click', async ()=>{
-  const u = document.getElementById('regUsername').value.trim();
-  const p = document.getElementById('regPassword').value.trim();
+    if (!user || !pass) return alert("Isi semua kolom!");
 
-  if(!u || !p){ alert('Masukkan username dan password'); return; }
+    const dbRef = ref(db);
+    const snap = await get(child(dbRef, "users/" + user));
+    if (snap.exists()) {
+      alert("Username sudah terdaftar!");
+      return;
+    }
 
-  const dbRef = ref(db);
-  const snapshot = await get(child(dbRef, "users/" + u));
-
-  if(snapshot.exists()){
-    alert('Username sudah terdaftar');
-  } else {
-    await set(ref(db, "users/" + u), {
-      username: u,
-      password: p,
-      saldo: 0,
-      createdAt: new Date().toISOString()
+    await set(ref(db, "users/" + user), {
+      username: user,
+      password: pass,
+      saldo: 10000,
+      createdAt: Date.now()
     });
-    alert('Akun berhasil dibuat! Silakan login.');
-    slideContainer.style.transform='translateX(0)';
-    document.getElementById('loginUsername').value = u;
-    document.getElementById('loginPassword').value = '';
-  }
-});
 
-// ==============================
-// LOGIN AKUN
-// ==============================
-document.getElementById('btnLogin').addEventListener('click', async ()=>{
-  const u = document.getElementById('loginUsername').value.trim();
-  const p = document.getElementById('loginPassword').value.trim();
+    alert("Pendaftaran berhasil! Silakan login.");
+    daftarForm.reset();
+  });
 
-  if(!u || !p){ alert('Masukkan username dan password'); return; }
+  // Fungsi login
+  loginForm.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const user = document.getElementById("loginUser").value.trim();
+    const pass = document.getElementById("loginPass").value.trim();
 
-  const dbRef = ref(db);
-  const snapshot = await get(child(dbRef, "users/" + u));
+    if (!user || !pass) return alert("Isi semua kolom!");
 
-  if(!snapshot.exists()){
-    alert('Username tidak ditemukan');
-    return;
-  }
+    const dbRef = ref(db);
+    const snap = await get(child(dbRef, "users/" + user));
 
-  const data = snapshot.val();
-  if(data.password !== p){
-    alert('Password salah');
-    return;
-  }
+    if (!snap.exists()) {
+      alert("User tidak ditemukan!");
+      return;
+    }
 
-  localStorage.setItem('currentUser', u);
-  alert('Login berhasil!');
-  window.location = 'slot.html';
+    const data = snap.val();
+    if (data.password !== pass) {
+      alert("Password salah!");
+      return;
+    }
+
+    // Simpan sesi pengguna
+    localStorage.setItem("currentUser", user);
+    alert("Login berhasil!");
+
+    if (user === "admin") {
+      window.location.href = "admin.html";
+    } else {
+      window.location.href = "slot.html";
+    }
+  });
 });
 </script>
+</head>
+<body style="font-family:sans-serif;background:#111;color:#fff;text-align:center;padding:20px;">
+  <h2>🎰 Casino Gold Login</h2>
 
+  <form id="loginForm" style="margin-bottom:20px;">
+    <input id="loginUser" placeholder="Username" required><br><br>
+    <input id="loginPass" type="password" placeholder="Password" required><br><br>
+    <button type="submit">Login</button>
+  </form>
+
+  <h3>Daftar Akun Baru</h3>
+  <form id="daftarForm">
+    <input id="regUser" placeholder="Username" required><br><br>
+    <input id="regPass" type="password" placeholder="Password" required><br><br>
+    <button type="submit">Daftar</button>
+  </form>
 </body>
 </html>
